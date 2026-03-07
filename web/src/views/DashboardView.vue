@@ -158,7 +158,7 @@ async function fetchAccounts() {
 }
 
 async function handleStart(uin) {
-  // 直接打开扫码登录对话框
+  // 无法复用 Session，显示 Code 登录框以便重新输入
   showQrDialog.value = true
   qrBase64.value = ''
   qrUin.value = uin

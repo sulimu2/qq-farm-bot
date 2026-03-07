@@ -22,6 +22,40 @@
         <div class="info-value">{{ formatNum(snapshot?.userState?.exp) }}</div>
       </div>
     </div>
+    
+    <!-- 额外数据 (化肥/收藏点) -->
+    <div class="extra-data-grid" v-if="snapshot?.userState?.fertilizer">
+      <div class="extra-card">
+        <div class="extra-card-header">
+          <el-icon><Pouring /></el-icon> 化肥容器
+        </div>
+        <div class="extra-card-body">
+          <div class="extra-item">
+            <div class="extra-label">普通</div>
+            <div class="extra-value">{{ (snapshot.userState.fertilizer.normal / 3600).toFixed(1) }}h</div>
+          </div>
+          <div class="extra-item">
+            <div class="extra-label">有机</div>
+            <div class="extra-value organic">{{ (snapshot.userState.fertilizer.organic / 3600).toFixed(1) }}h</div>
+          </div>
+        </div>
+      </div>
+      <div class="extra-card">
+        <div class="extra-card-header">
+          <el-icon><CollectionTag /></el-icon> 收藏点
+        </div>
+        <div class="extra-card-body">
+          <div class="extra-item">
+            <div class="extra-label">普通</div>
+            <div class="extra-value">{{ snapshot.userState.collectionPoints?.normal || 0 }}</div>
+          </div>
+          <div class="extra-item">
+            <div class="extra-label">典藏</div>
+            <div class="extra-value classic">{{ snapshot.userState.collectionPoints?.classic || 0 }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 连接状态 -->
     <div class="status-bar">
@@ -72,6 +106,17 @@
           <div class="toggle-row">
             <span class="toggle-label">自动升级土地 <el-tooltip content="自动升级已有土地等级" placement="top"><el-icon :size="14"><QuestionFilled /></el-icon></el-tooltip></span>
             <el-switch v-model="toggles.autoLandUpgrade" @change="saveToggles" />
+          </div>
+          <div v-if="toggles.autoLandUpgrade" class="toggle-row sub-row">
+            <span class="toggle-label">最高升级至</span>
+            <el-select v-model="toggles.landUpgradeTarget" size="small" @change="saveToggles" style="width: 120px">
+              <el-option :value="1" label="红土地" />
+              <el-option :value="2" label="黑土地" />
+              <el-option :value="3" label="金土地" />
+              <el-option :value="4" label="紫土地" />
+              <el-option :value="5" label="翡翠土地" />
+              <el-option :value="6" label="蓝宝石土地" />
+            </el-select>
           </div>
         </div>
 
@@ -229,7 +274,7 @@
 <script setup>
 import { ref, onMounted, onUnmounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAccountSnapshot, updateToggles, startBot, stopBot, startQrLogin, cancelQrLogin } from '../api/index.js'
+import { getAccountSnapshot, updateToggles, startBot, stopBot, startQrLogin, cancelQrLogin, addAccountByCode } from '../api/index.js'
 import { onEvent, offEvent } from '../socket/index.js'
 import QrCodeDialog from '../components/QrCodeDialog.vue'
 
@@ -290,13 +335,34 @@ async function saveToggles() {
 }
 
 async function handleStart() {
-  // 打开扫码登录对话框
+  // 无法复用 Session，点击启动直接弹出 Code 登录框
   qrDialogVisible.value = true
   qrBase64.value = ''
   qrStatus.value = 'idle'
 }
 
 async function handleQrConfirm(form) {
+  // 手动输入 authCode 模式
+  if (form.manual && form.code) {
+    qrStatus.value = 'loading'
+    try {
+      await addAccountByCode({
+        code: form.code,
+        uin: form.uin,
+        platform: form.platform,
+        farmInterval: form.farmInterval,
+        friendInterval: form.friendInterval,
+      })
+      ElMessage.success('登录成功')
+      qrDialogVisible.value = false
+      fetchData()
+    } catch (e) {
+      qrStatus.value = 'idle'
+      ElMessage.error(e.message)
+    }
+    return
+  }
+
   qrStatus.value = 'loading'
   try {
     const res = await startQrLogin(props.uin, {
@@ -385,6 +451,7 @@ function onQrError(data) {
 
 onMounted(() => {
   fetchData()
+  timer = setInterval(fetchData, 5000)
   onEvent('bot:stateUpdate', onStateUpdate)
   onEvent('qr:scanned', onQrScanned)
   onEvent('qr:expired', onQrExpired)
@@ -579,6 +646,70 @@ onUnmounted(() => {
   color: var(--text-muted);
 }
 
+/* 额外数据 (化肥/收藏点) */
+.extra-data-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.extra-card {
+  background: var(--bg-surface); 
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text);
+  box-shadow: var(--shadow);
+}
+
+.extra-card-header {
+  font-size: 13px;
+  color: var(--text-secondary);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 12px;
+  font-weight: 500;
+}
+
+.extra-card-header .el-icon {
+  font-size: 16px;
+  color: var(--color-primary);
+}
+
+.extra-card-body {
+  display: flex;
+  justify-content: space-around;
+  align-items: center;
+}
+
+.extra-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.extra-label {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.extra-value {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.extra-value.organic {
+  color: var(--color-success);
+}
+
+.extra-value.classic {
+  color: var(--color-warning);
+}
+
 .empty-state {
   padding: 60px 20px;
   text-align: center;
@@ -622,4 +753,14 @@ onUnmounted(() => {
     padding: 14px;
   }
 }
+.toggle-row.sub-row {
+  margin-top: -8px;
+  padding-left: 20px;
+  margin-bottom: 8px;
+}
+.toggle-row.sub-row .toggle-label {
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
 </style>

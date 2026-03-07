@@ -37,6 +37,25 @@
           </el-select>
           <span class="unit">清空则自动选择</span>
         </el-form-item>
+        <el-form-item label="偷取作物黑名单">
+          <el-select
+            v-model="stealBlacklist"
+            multiple
+            filterable
+            collapse-tags
+            collapse-tags-tooltip
+            placeholder="选择不偷取的作物 (多选)"
+            style="width: 380px"
+          >
+            <el-option
+              v-for="item in cropList"
+              :key="item.id"
+              :value="item.id"
+              :label="item.name"
+            />
+          </el-select>
+          <div class="unit">多选，选中的作物将不会被自动偷取</div>
+        </el-form-item>
         <el-form-item>
           <el-button type="primary" @click="saveConfig" :loading="saving">保存配置</el-button>
         </el-form-item>
@@ -97,7 +116,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { getAccountSnapshot, updateAccountConfig, getPlantRanking, getCropList } from '../api/index.js'
+import { getAccountSnapshot, updateAccountConfig, getPlantRanking, getCropList, updateToggles } from '../api/index.js'
 
 const props = defineProps({ uin: String })
 
@@ -106,6 +125,8 @@ const friendIntervalSec = ref(10)
 const preferredSeedId = ref(29999)  // 29999 = 白萝卜仙人
 const saving = ref(false)
 const userLevel = ref(1)
+const stealBlacklist = ref([])
+const featureToggles = ref({})
 
 const ranking = ref([])
 const rankingLoading = ref(false)
@@ -121,7 +142,13 @@ async function fetchConfig() {
     userLevel.value = data.userState?.level || 1
     // 显式判断，保留 0 表示自动选择
     preferredSeedId.value = data.preferredSeedId ?? 0
-  } catch { /* */ }
+    
+    // 加载黑名单
+    featureToggles.value = data.featureToggles || {}
+    stealBlacklist.value = featureToggles.value.stealBlacklist || []
+  } catch (e) {
+    console.error('获取配置失败:', e)
+  }
 }
 
 async function saveConfig() {
@@ -132,6 +159,13 @@ async function saveConfig() {
       friendInterval: friendIntervalSec.value * 1000,
       preferredSeedId: preferredSeedId.value || 0,
     })
+    
+    // 保存黑名单到 featureToggles
+    await updateToggles(props.uin, {
+      ...featureToggles.value,
+      stealBlacklist: stealBlacklist.value
+    })
+
     ElMessage.success('配置已保存')
   } catch (e) {
     ElMessage.error(e.message)

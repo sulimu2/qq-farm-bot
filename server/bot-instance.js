@@ -88,7 +88,11 @@ class BotInstance extends EventEmitter {
         this.heartbeatMissCount = 0;
 
         // ---------- 用户游戏状态 ----------
-        this.userState = { gid: 0, name: '', level: 0, gold: 0, exp: 0 };
+        this.userState = {
+            gid: 0, name: '', level: 0, gold: 0, exp: 0,
+            fertilizer: { normal: 0, organic: 0 }, // 化肥容器时长 (秒)
+            collectionPoints: { normal: 0, classic: 0 }, // 收藏点
+        };
         this.serverTimeMs = 0;
         this.localTimeAtSync = 0;
 
@@ -141,14 +145,16 @@ class BotInstance extends EventEmitter {
             autoWater: true,           // 自动浇水
             autoLandUnlock: true,      // 自动解锁新土地（开拓）
             autoLandUpgrade: true,     // 自动升级土地
+            landUpgradeTarget: 6,      // 自动升级土地的目标等级 (0:普通, 1:红, 2:黑, 3:金, 4:紫, 5:翡, 6:蓝)
 
             // ========== 好友互动功能 ==========
             friendVisit: true,         // 访问好友农场
             autoSteal: true,           // 自动偷菜
+            skipStealRadish: true,     // 偷菜时跳过白萝卜
+            stealBlacklist: [],        // 偷菜黑名单 (plantId 数组)
             friendHelp: true,          // 帮好友除草/除虫/浇水
             friendPest: true,          // 给好友放虫（损人）
             helpEvenExpFull: true,     // 经验满了也继续帮忙
-            skipStealRadish: true,     // 偷菜时跳过白萝卜
 
             // ========== 系统功能 ==========
             autoTask: true,            // 自动完成并领取任务
@@ -480,6 +486,7 @@ class BotInstance extends EventEmitter {
 
                     this.log('登录', `登录成功 | 昵称: ${this.userState.name} | GID: ${this.userState.gid} | 等级: Lv${this.userState.level} | 金币: ${this.userState.gold.toLocaleString()} | 经验: ${this.userState.exp.toLocaleString()}`);
                     this._setStatus('running');
+                    this._updateExtraUserInfo(true).catch(e => this.logWarn('系统', `初始获取额外信息失败: ${e.message}`));
                     this._emitStateUpdate();
                 }
                 this.startHeartbeat();
@@ -883,7 +890,11 @@ class BotInstance extends EventEmitter {
 
             // 已解锁的土地 → 检查是否可以升级
             if (land.could_upgrade) {
-                result.upgradable.push(id);
+                const currentLevel = toNum(land.level || 0);
+                const targetLevel = this.featureToggles.landUpgradeTarget ?? 6;
+                if (currentLevel < targetLevel) {
+                    result.upgradable.push(id);
+                }
             }
 
             const plant = land.plant;
@@ -940,6 +951,8 @@ class BotInstance extends EventEmitter {
     async checkFarm() {
         if (this.isCheckingFarm || !this.userState.gid) return;
         this.isCheckingFarm = true;
+        // 定期更新额外用户信息 (化肥容器/收藏点)
+        await this._updateExtraUserInfo();
         try {
             const landsReply = await this.getAllLands();
             if (!landsReply.lands || landsReply.lands.length === 0) { this.log('农场', '没有土地数据'); return; }
@@ -1281,6 +1294,10 @@ class BotInstance extends EventEmitter {
                     const plantId = toNum(plant.id);
                     // 跳过白萝卜
                     if (this.featureToggles.skipStealRadish && RADISH_PLANT_IDS.includes(plantId)) {
+                        continue;
+                    }
+                    // 检查黑名单
+                    if (this.featureToggles.stealBlacklist && this.featureToggles.stealBlacklist.includes(plantId)) {
                         continue;
                     }
                     result.stealable.push(id);
@@ -2094,6 +2111,52 @@ class BotInstance extends EventEmitter {
         } catch (e) {
             this._markDoneToday('illustrated');
             return false;
+        }
+    }
+
+    /** 更新额外用户信息 (化肥容器、收藏点等) */
+    async _updateExtraUserInfo(force = false) {
+        const now = Date.now();
+        if (!force && this._lastExtraUserUpdateAt && now - this._lastExtraUserUpdateAt < 300000) return;
+
+        try {
+            // 1. 化肥容器
+            const bagReply = await this._getBag();
+            const items = this._getBagItems(bagReply);
+            let normalSec = 0, organicSec = 0;
+            for (const it of items) {
+                const id = toNum(it.id);
+                if (id === 1011) normalSec = toNum(it.count);
+                if (id === 1012) organicSec = toNum(it.count);
+            }
+            this.userState.fertilizer = { normal: normalSec, organic: organicSec };
+
+            // 2. 收藏点
+            const illustratedReq = types.GetIllustratedListV2Request.encode(
+                types.GetIllustratedListV2Request.create({ refresh: true, full: true })
+            ).finish();
+            const { body: replyBody } = await this.sendMsgAsync(
+                'gamepb.illustratedpb.IllustratedService', 'GetIllustratedListV2', illustratedReq
+            );
+            const illustratedReply = types.GetIllustratedListV2Reply.decode(replyBody);
+
+            let normalPoints = 0, classicPoints = 0;
+            if (illustratedReply.items) {
+                for (const it of illustratedReply.items) {
+                    // 只要解锁了或收获过就算收藏点
+                    if (it.unlocked || toNum(it.harvest_count) > 0) {
+                        // category 2 为典藏，其他通常为普通
+                        if (toNum(it.category) === 2) classicPoints++;
+                        else normalPoints++;
+                    }
+                }
+            }
+            this.userState.collectionPoints = { normal: normalPoints, classic: classicPoints };
+
+            this._lastExtraUserUpdateAt = now;
+            this._emitStateUpdate();
+        } catch (e) {
+            this.logWarn('系统', `更新额外用户信息失败: ${e.message}`);
         }
     }
 

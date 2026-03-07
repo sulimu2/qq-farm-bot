@@ -41,7 +41,7 @@
     <!-- 初始状态：显示 tabs -->
     <template v-else>
       <el-tabs v-model="activeTab" stretch>
-        <el-tab-pane label="QQ扫码登录" name="qr">
+        <!-- <el-tab-pane label="QQ扫码登录" name="qr">
           <el-form :model="form" label-width="100px" @submit.prevent="handleSubmit">
             <el-form-item label="QQ号" required>
               <el-input
@@ -71,7 +71,7 @@
               <span class="unit-text">秒</span>
             </el-form-item>
           </el-form>
-        </el-tab-pane>
+        </el-tab-pane> -->
 
         <el-tab-pane label="Code 登录" name="manual">
           <el-form :model="manualForm" label-width="100px" @submit.prevent="handleManualSubmit">
@@ -159,7 +159,7 @@ const dialogVisible = computed({
   set: (v) => emit('update:visible', v),
 })
 
-const activeTab = ref('qr')
+const activeTab = ref('manual')
 
 const form = ref({
   uin: '',

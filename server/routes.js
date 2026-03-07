@@ -342,7 +342,7 @@ router.get('/crop-list', (req, res) => {
 //  QR 扫码登录
 // ============================================================
 
-/** POST /api/accounts/:uin/qr-login */
+/** POST /api/accounts/:uin/qr-login (Frontend is currently isolating this feature) */
 router.post('/accounts/:uin/qr-login', async (req, res) => {
     try {
         const { uin } = req.params;
