@@ -136,7 +136,7 @@ qq-farm-bot/
 ### 安装
 
 ```bash
-git clone https://github.com/maile456/qq-farm-bot.git
+git clone https://github.com/sulimu/qq-farm-bot.git
 cd qq-farm-bot
 
 # 一键安装所有依赖 (后端 + 前端)
