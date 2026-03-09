@@ -2658,7 +2658,12 @@ class BotInstance extends EventEmitter {
             for (const land of lands) {
                 const id = toNum(land.id);
                 const unlocked = !!land.unlocked;
-                const detail = { id, unlocked, soilType: toNum(land.soil_type) || 0 };
+
+                // ✅ 土壤类型/土地类型：本服由 land.level / land.lands_level 表示
+                // 通常：1=普通 2=红 3=黑 4=金
+                const soilType = toNum(land.level) || toNum(land.lands_level) || 1;
+                const detail = { id, unlocked, soilType };
+
                 if (!unlocked) { landDetails.push(detail); continue; }
 
                 const plant = land.plant;
@@ -2677,6 +2682,27 @@ class BotInstance extends EventEmitter {
                 detail.plantName = plantName;
                 detail.phase = phaseVal;
                 detail.phaseName = PHASE_NAMES[phaseVal] || '未知';
+
+                //土地变异情况
+                const rawMutants = Array.isArray(plant.phases)
+                    ? plant.phases.flatMap(p => Array.isArray(p.mutants) ? p.mutants : [])
+                    : [];
+
+                const mutantMap = new Map();
+                for (const m of rawMutants) {
+                    const mutantId = toNum(m.mutant_config_id);
+                    if (!mutantId) continue;
+
+                    if (!mutantMap.has(mutantId)) {
+                        mutantMap.set(mutantId, {
+                            mutant_config_id: mutantId,
+                            mutant_time: toNum(m.mutant_time),
+                            weather_id: toNum(m.weather_id),
+                        });
+                    }
+                }
+
+                detail.mutants = Array.from(mutantMap.values());
 
                 // 季数信息
                 const plantCfg = getPlantById(plantId);
