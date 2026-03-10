@@ -21,9 +21,7 @@ QQ 农场全自动挂机管理平台 — 多账号、可视化、实时控制
 
 基于 Node.js + Vue 3 构建的 QQ 农场自动化工具，支持多账号同时管理，提供 Web 可视化面板，实现种植、收获、偷菜、任务领取、仓库出售等全流程自动化。
 
-QQ交流群：1085755562有问题可进群交流
 
-Telegram群：[QQ经典农场绿玩群](https://t.me/+YyodAWzx-tA2ZDk1)
 ---
 
 ## 功能特性
@@ -64,28 +62,7 @@ Telegram群：[QQ经典农场绿玩群](https://t.me/+YyodAWzx-tA2ZDk1)
 
 ---
 
-## 应用截图
 
-| 账号管理 | 账号主页 |
-|:---:|:---:|
-| ![账号管理](docs/images/dashboard.png) | ![账号主页](docs/images/account-home.png) |
-
-| 土地详情 | 统计报表 |
-|:---:|:---:|
-| ![土地详情](docs/images/account-lands.png) | ![统计报表](docs/images/count.png) |
-
-| 实时日志 | 种植排行 |
-|:---:|:---:|
-| ![日志页](docs/images/account-logs.png) | ![设置页](docs/images/account-settings.png) |
-
-| 通知设置 | 邮件通知 |
-|:---:|:---:|
-| ![通知设置](docs/images/email-notify-report.png) | ![邮件通知](docs/images/email-notify.png) |
-
-| 定时汇报邮件 | 用户管理 |
-|:---:|:---:|
-| ![定时汇报邮件](docs/images/hours-report.png) | ![用户管理](docs/images/admin-users.png) |
----
 ## 技术栈
 
 | 层 | 技术 |
